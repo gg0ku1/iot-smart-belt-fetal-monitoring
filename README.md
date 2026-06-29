@@ -115,6 +115,21 @@ iot-smart-belt-fetal-monitoring/
 
 <p align="center"><img src="screenshots/graphs.png" width="900"></p>
 
+## 📌 Project Posters
+
+### Semester VII Poster
+
+<p align="center">
+  <img src="docs/poster_sem1.jpg" width="700">
+</p>
+
+---
+
+### Semester VIII Poster
+
+<p align="center">
+  <img src="docs/poster_sem2.png" width="700">
+</p>
 ---
 
 ## ML Pipeline
