@@ -113,7 +113,7 @@ iot-smart-belt-fetal-monitoring/
 
 ### Physiological data graphs
 
-<p align="center"><img src="screenshots/graph.png" width="900"></p>
+<p align="center"><img src="screenshots/graphs.png" width="900"></p>
 
 ---
 
