@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VITALIS MONITOR | IoT Smart Belt Monitoring System</title>
+  <meta name="description" content="Real-time IoT fetal health monitoring dashboard with live vitals, intelligent ML status classification, and emergency alerts." />
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+    window._firebaseLoaded = { initializeApp, getDatabase, ref, onValue, set };
+    window.dispatchEvent(new Event('firebase-ready'));
+  </script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@500;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">
+        <span class="material-symbols-outlined brand-icon">monitor_heart</span>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">VITALIS</div>
+        <div class="brand-sub">IoT Smart Belt v2.4</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" id="nav-overview" onclick="sidebarNav('overview-section',this);return false;">
+        <span class="material-symbols-outlined">dashboard</span>
+        <span>Overview</span>
+      </a>
+      <a href="#" class="nav-item" id="nav-history" onclick="sidebarNav('analytics-section',this);return false;">
+        <span class="material-symbols-outlined">history</span>
+        <span>History</span>
+      </a>
+      <a href="#" class="nav-item" id="nav-alerts" onclick="sidebarNav('alerts-section',this);return false;">
+        <span class="material-symbols-outlined">notification_important</span>
+        <span>Alerts</span>
+        <span class="nav-badge" id="alert-badge">0</span>
+      </a>
+      <a href="#" class="nav-item" id="nav-settings" onclick="toggleSettingsPanel();return false;">
+        <span class="material-symbols-outlined">tune</span>
+        <span>Settings</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="btn-emergency" id="btn-call-emergency" onclick="triggerEmergency()">
+        <span class="material-symbols-outlined">emergency</span>
+        Call Emergency
+      </button>
+      <div class="sidebar-links">
+        <a href="#" class="sidebar-link" onclick="showToast('Support is available at vitalis-support@hospital.org','info');return false;">
+          <span class="material-symbols-outlined">help_outline</span> Support
+        </a>
+        <a href="#" class="sidebar-link" onclick="showToast('Session saved. Please close the browser tab to exit.','info');return false;">
+          <span class="material-symbols-outlined">logout</span> Log Out
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN WRAPPER ===================== -->
+  <div class="main-wrapper">
+
+    <!-- ===================== TOPBAR ===================== -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="menu-toggle" onclick="toggleSidebar()">
+          <span class="material-symbols-outlined">menu</span>
+        </button>
+        <div class="topbar-title">VITALIS MONITOR</div>
+        <nav class="topbar-nav">
+          <span class="topbar-link active" onclick="scrollToSection('overview-section')" style="cursor:pointer;">Live Feed</span>
+          <span class="topbar-link" onclick="scrollToSection('analytics-section')" style="cursor:pointer;">Analytics</span>
+          <span class="topbar-link" onclick="scrollToSection('patient-section')" style="cursor:pointer;">Patients</span>
+        </nav>
+      </div>
+      <div class="topbar-right">
+        <!-- MODE INDICATOR -->
+        <div id="mode-indicator" onclick="openModePanel()" title="Click to switch mode"
+          style="display:flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;
+                 border:1px solid;cursor:pointer;font-size:11px;font-weight:800;
+                 letter-spacing:1px;transition:all 0.2s;">
+          <span style="width:7px;height:7px;border-radius:50%;background:currentColor;
+                       animation:live-blink 1.5s infinite;flex-shrink:0;"></span>
+          <span id="mode-text">Mode: DEMO (Simulated Data)</span>
+        </div>
+        <div class="notif-btn-wrap">
+          <button class="icon-btn" title="Notifications" onclick="scrollToSection('alerts-section')" id="btn-notifications">
+            <span class="material-symbols-outlined">notifications</span>
+          </button>
+          <span class="notif-dot" id="notif-dot"></span>
+        </div>
+        <button class="icon-btn" title="Settings" onclick="toggleSettingsPanel()" id="btn-settings">
+          <span class="material-symbols-outlined">settings</span>
+        </button>
+        <div class="user-avatar" title="Dr. Priya Menon">PM</div>
+      </div>
+    </header>
+
+    <!-- ===================== MAIN CONTENT ===================== -->
+    <main class="main-content">
+
+      <!-- Page Header -->
+      <div class="page-header">
+        <div class="page-header-left">
+          <h1 class="page-title">IoT Smart Belt Monitoring System</h1>
+          <div class="page-meta">
+            <span class="badge-patient">
+              <span class="material-symbols-outlined" style="font-size:14px;">person</span>
+              PATIENT ID: 884-293
+            </span>
+            <span class="page-meta-sep">•</span>
+            <span class="page-meta-text">Unit 4-B · Clinical Wing · Fetal Health</span>
+            <span class="page-meta-sep">•</span>
+            <span class="live-dot-wrap">
+              <span class="live-dot" id="live-dot"></span>
+              <span class="live-text" id="live-text">LIVE</span>
+            </span>
+          </div>
+        </div>
+        <div class="page-header-right">
+          <button class="btn-secondary" onclick="sendAlert()">
+            <span class="material-symbols-outlined">warning</span> Send Alert
+          </button>
+          <button class="btn-primary" onclick="triggerEmergency()">
+            <span class="material-symbols-outlined">emergency</span> Emergency
+          </button>
+        </div>
+      </div>
+
+      <!-- =========== PATIENT INFO + SIM CONTROL ROW =========== -->
+      <div class="patient-sim-row" id="patient-section">
+
+        <!-- Patient Info Card -->
+        <div class="patient-card">
+          <div class="patient-card-header">
+            <span class="material-symbols-outlined" style="font-size:18px;color:var(--primary)">person_pin</span>
+            <span class="patient-card-title">Patient Profile</span>
+            <span class="patient-status-chip">Monitoring Active</span>
+          </div>
+          <div class="patient-details">
+            <div class="patient-detail-row">
+              <span class="patient-detail-label">Name</span>
+              <span class="patient-detail-value">Demo Patient</span>
+            </div>
+            <div class="patient-detail-row">
+              <span class="patient-detail-label">Age</span>
+              <span class="patient-detail-value">28 years</span>
+            </div>
+            <div class="patient-detail-row">
+              <span class="patient-detail-label">Gestation</span>
+              <span class="patient-detail-value">32 weeks</span>
+            </div>
+            <div class="patient-detail-row">
+              <span class="patient-detail-label">Patient ID</span>
+              <span class="patient-detail-value" style="color:var(--primary);font-family:'Manrope',sans-serif;font-weight:800;">884-293</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulation Control Panel -->
+        <div class="sim-panel">
+          <div class="sim-panel-header">
+            <span class="material-symbols-outlined" style="font-size:18px;color:var(--secondary)">science</span>
+            <span class="sim-panel-title">Simulation Control</span>
+            <span class="sim-panel-sub">Instantly push predefined values to Firebase</span>
+          </div>
+          <div class="sim-buttons">
+            <button class="sim-btn sim-normal" id="sim-btn-normal" onclick="simulateScenario('NORMAL')">
+              <span class="sim-btn-icon">✅</span>
+              <span class="sim-btn-label">NORMAL</span>
+              <span class="sim-btn-sub">HR 85 · Temp 36.5</span>
+            </button>
+            <button class="sim-btn sim-suspect" id="sim-btn-suspect" onclick="simulateScenario('SUSPECT')">
+              <span class="sim-btn-icon">⚠️</span>
+              <span class="sim-btn-label">SUSPECT</span>
+              <span class="sim-btn-sub">HR 125 · Temp 37.0</span>
+            </button>
+            <button class="sim-btn sim-patho" id="sim-btn-patho" onclick="simulateScenario('PATHOLOGICAL')">
+              <span class="sim-btn-icon">🚨</span>
+              <span class="sim-btn-label">PATHOLOGICAL</span>
+              <span class="sim-btn-sub">HR 150 · Temp 38.0</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- =========== STATUS BANNER =========== -->
+      <div class="status-banner" id="status-banner">
+        <div class="status-banner-left">
+          <div class="status-icon-wrap" id="status-icon-wrap">
+            <span class="material-symbols-outlined status-icon" id="status-icon">check_circle</span>
+          </div>
+          <div class="status-info">
+            <div class="status-label" id="status-label">STATUS: NORMAL</div>
+            <div class="status-desc" id="status-desc">All vital parameters are within safe limits. No abnormalities detected.</div>
+          </div>
+        </div>
+        <div class="status-banner-right">
+          <div class="status-time-label">Last Update</div>
+          <div class="status-time" id="status-time">--:--:--.---</div>
+          <div class="connection-status" id="connection-status">
+            <span class="conn-dot"></span> Firebase Connected
+          </div>
+          <!-- System Labels -->
+          <div class="system-labels" id="system-labels">
+            <span class="sys-label"><span class="material-symbols-outlined" style="font-size:11px">database</span> Source: Firebase (Real-time)</span>
+            <span class="sys-label"><span class="material-symbols-outlined" style="font-size:11px">check_circle</span> System Status: Active</span>
+            <span class="sys-label"><span class="material-symbols-outlined" style="font-size:11px">schedule</span> Updated: <span id="last-updated">--:--:--</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== VITAL DATA CARDS =========== -->
+      <div class="vitals-grid">
+
+        <!-- Pulse Card -->
+        <div class="vital-card" id="pulse-card">
+          <div class="vital-card-top">
+            <div class="vital-icon pulse-icon">
+              <span class="material-symbols-outlined">favorite</span>
+            </div>
+            <div class="vital-badge" id="pulse-badge">
+              <span class="material-symbols-outlined" style="font-size:12px">trending_up</span>
+              Normal
+            </div>
+          </div>
+          <div class="vital-value-row">
+            <span class="vital-value" id="pulse-value">--</span>
+            <span class="vital-unit">BPM</span>
+          </div>
+          <div class="vital-label">Fetal Heart Rate</div>
+          <div class="vital-sparkline" id="pulse-sparkline">
+            <canvas id="pulse-mini-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Temperature Card -->
+        <div class="vital-card" id="temp-card">
+          <div class="vital-card-top">
+            <div class="vital-icon temp-icon">
+              <span class="material-symbols-outlined">thermostat</span>
+            </div>
+            <div class="vital-badge" id="temp-badge">
+              <span class="material-symbols-outlined" style="font-size:12px">horizontal_rule</span>
+              Stable
+            </div>
+          </div>
+          <div class="vital-value-row">
+            <span class="vital-value" id="temp-value">--</span>
+            <span class="vital-unit">°C</span>
+          </div>
+          <div class="vital-label">Maternal Temperature</div>
+          <div class="vital-bar-wrap">
+            <div class="vital-bar-track">
+              <div class="vital-bar-fill" id="temp-bar"></div>
+            </div>
+            <div class="vital-bar-labels">
+              <span>35°C</span><span>Normal</span><span>40°C</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Movement Card -->
+        <div class="vital-card" id="move-card">
+          <div class="vital-card-top">
+            <div class="vital-icon move-icon">
+              <span class="material-symbols-outlined">directions_run</span>
+            </div>
+            <div class="vital-badge" id="move-badge">
+              <span class="material-symbols-outlined" style="font-size:12px">radar</span>
+              Detecting
+            </div>
+          </div>
+          <div class="vital-value-row">
+            <span class="vital-value move-value" id="move-value">--</span>
+          </div>
+          <div class="vital-label">Fetal Movement</div>
+          <div class="movement-dots" id="movement-dots">
+            <div class="m-dot"></div>
+            <div class="m-dot"></div>
+            <div class="m-dot"></div>
+            <div class="m-dot"></div>
+            <div class="m-dot"></div>
+          </div>
+        </div>
+
+        <!-- Stats Mini Card -->
+        <div class="vital-card stats-card">
+          <div class="stats-row">
+            <div class="stat-item">
+              <span class="stat-label">Session</span>
+              <span class="stat-val" id="stat-session">00:00:00</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-label">Alerts</span>
+              <span class="stat-val alert-count" id="stat-alerts">0</span>
+            </div>
+          </div>
+          <div class="stats-row" style="margin-top:12px">
+            <div class="stat-item">
+              <span class="stat-label">Battery</span>
+              <span class="stat-val">
+                <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle">battery_full</span>
+                <span id="stat-battery">98%</span>
+              </span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-label">Signal</span>
+              <span class="stat-val">
+                <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle">wifi</span>
+                Strong
+              </span>
+            </div>
+          </div>
+          <div class="device-label">
+            <span class="material-symbols-outlined" style="font-size:14px">settings_input_antenna</span>
+            Smart Belt v4 · Connected
+          </div>
+        </div>
+      </div>
+
+      <!-- =========== CHARTS + ALERTS GRID =========== -->
+      <div class="charts-alerts-grid" id="analytics-section">
+
+        <!-- Charts Section -->
+        <div class="charts-panel" id="overview-section">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span class="material-symbols-outlined">show_chart</span>
+              Vital Analytics Timeline
+            </div>
+            <div class="time-toggle">
+              <button class="time-btn active" data-range="6H" onclick="setTimeRange(this,'6H')">6H</button>
+              <button class="time-btn" data-range="12H" onclick="setTimeRange(this,'12H')">12H</button>
+              <button class="time-btn" data-range="24H" onclick="setTimeRange(this,'24H')">24H</button>
+            </div>
+          </div>
+
+          <div class="chart-block">
+            <div class="chart-label-row">
+              <span class="chart-label">Pulse Variance (BPM)</span>
+              <span class="chart-avg" id="pulse-avg-label">avg. -- bpm</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="pulse-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-block">
+            <div class="chart-label-row">
+              <span class="chart-label">Temperature (°C)</span>
+              <span class="chart-avg" id="temp-avg-label">avg. -- °C</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="temp-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-block">
+            <div class="chart-label-row">
+              <span class="chart-label">Movement Activity</span>
+              <span class="chart-avg" id="move-avg-label">Intensity Index</span>
+            </div>
+            <div class="chart-container chart-container-sm">
+              <canvas id="move-chart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alert Panel -->
+        <div class="alerts-panel" id="alerts-section">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span class="material-symbols-outlined">history</span>
+              Event Logs
+            </div>
+            <button class="clear-btn" onclick="clearAlerts()">Clear</button>
+          </div>
+          <div class="alerts-list" id="alerts-list">
+            <div class="alert-empty">
+              <span class="material-symbols-outlined" style="font-size:36px;opacity:0.3">notifications_none</span>
+              <p>No events yet. Monitoring live...</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- =========== ML LOGIC PANEL =========== -->
+      <div class="ml-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="material-symbols-outlined">psychology</span>
+            ML Classification Engine
+          </div>
+          <div class="ml-status-chip" id="ml-chip">
+            <span class="ml-chip-dot"></span>
+            Processing
+          </div>
+        </div>
+        <div class="ml-grid">
+          <div class="ml-rule" id="ml-normal">
+            <div class="ml-rule-header">
+              <span class="ml-rule-icon normal-icon">✅</span>
+              <span class="ml-rule-name">NORMAL</span>
+            </div>
+            <div class="ml-rule-conditions">
+              <code>pulse &lt; 100 AND movement &gt; 0</code>
+            </div>
+            <div class="ml-rule-status" id="ml-normal-status">–</div>
+          </div>
+          <div class="ml-rule" id="ml-suspect">
+            <div class="ml-rule-header">
+              <span class="ml-rule-icon suspect-icon">⚠️</span>
+              <span class="ml-rule-name">SUSPECT</span>
+            </div>
+            <div class="ml-rule-conditions">
+              <code>pulse &gt; 120 AND movement == 0</code>
+            </div>
+            <div class="ml-rule-status" id="ml-suspect-status">–</div>
+          </div>
+          <div class="ml-rule" id="ml-pathological">
+            <div class="ml-rule-header">
+              <span class="ml-rule-icon patho-icon">🚨</span>
+              <span class="ml-rule-name">PATHOLOGICAL</span>
+            </div>
+            <div class="ml-rule-conditions">
+              <code>pulse &gt; 140 AND temp &gt; 37.5</code>
+            </div>
+            <div class="ml-rule-status" id="ml-patho-status">–</div>
+          </div>
+          <div class="ml-output-card" id="ml-output-card">
+            <div class="ml-output-label">Current Classification</div>
+            <div class="ml-output-value" id="ml-output-value">AWAITING DATA</div>
+            <div class="ml-output-confidence" id="ml-output-conf">Confidence: --</div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ===================== EMERGENCY MODAL ===================== -->
+  <div class="modal-overlay" id="emergency-modal">
+    <div class="modal-box emergency-modal-box">
+      <div class="modal-icon-wrap emergency-icon-bg">
+        <span class="material-symbols-outlined modal-icon-inner">emergency</span>
+      </div>
+      <h2 class="modal-title" style="color:var(--error);font-size:20px;">🚨 CRITICAL ALERT</h2>
+      <p style="font-size:18px;font-weight:900;color:#fff;margin-bottom:8px;font-family:'Manrope',sans-serif;">Fetal distress detected</p>
+      <p class="modal-desc">Immediate medical attention required. Emergency services have been notified. A critical alert has been sent to the clinical team for <strong>Patient 884-293</strong>.</p>
+      <div class="modal-meta">
+        <span>🕐 <span id="modal-time"></span></span>
+        <span>📍 Unit 4-B, Clinical Wing</span>
+        <span>⚡ Status set to: PATHOLOGICAL</span>
+      </div>
+      <button class="modal-close-btn" onclick="closeModal('emergency-modal')">Acknowledge &amp; Continue Monitoring</button>
+    </div>
+  </div>
+
+  <!-- ===================== SEND ALERT MODAL ===================== -->
+  <div class="modal-overlay" id="alert-modal">
+    <div class="modal-box">
+      <div class="modal-icon-wrap warning-icon-bg">
+        <span class="material-symbols-outlined modal-icon-inner">warning</span>
+      </div>
+      <h2 class="modal-title">Alert Sent to Clinical Team</h2>
+      <p class="modal-desc">A status alert has been dispatched to the on-duty medical team. Monitoring continues.</p>
+      <button class="modal-close-btn secondary-modal-btn" onclick="closeModal('alert-modal')">OK</button>
+    </div>
+  </div>
+
+  <!-- ===================== MODE SWITCHER PANEL ===================== -->
+  <div class="modal-overlay" id="mode-panel">
+    <div class="modal-box" style="max-width:500px;text-align:left;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+        <h2 class="modal-title" style="margin:0">Data Source Mode</h2>
+        <button onclick="closeModePanel()" style="background:none;border:none;color:#5a6480;cursor:pointer;font-size:20px;">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <!-- Demo Mode Option -->
+      <div style="background:#171f33;border:1px solid rgba(255,185,95,0.2);border-radius:12px;padding:20px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:20px;">📡</span>
+          <div>
+            <div style="font-weight:800;font-size:14px;color:#ffb95f;">Demo Mode</div>
+            <div style="font-size:12px;color:#5a6480;">Simulated ESP32 data — no hardware required</div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:#9ba8c4;margin-bottom:14px;line-height:1.6;">
+          Automatically cycles through <strong>Normal → Suspect → Pathological</strong> states every ~30 seconds.
+          Perfect for presentations and testing.
+        </p>
+        <button onclick="switchToDemo()"
+          style="background:rgba(255,185,95,0.12);color:#ffb95f;border:1px solid rgba(255,185,95,0.3);
+                 border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;
+                 width:100%;transition:all 0.2s;"
+          onmouseover="this.style.background='rgba(255,185,95,0.2)'"
+          onmouseout="this.style.background='rgba(255,185,95,0.12)'">
+          ▶ Switch to Demo Mode
+        </button>
+      </div>
+
+      <!-- Firebase Live Mode Option -->
+      <div style="background:#171f33;border:1px solid rgba(78,222,163,0.2);border-radius:12px;padding:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span style="font-size:20px;">🔥</span>
+          <div>
+            <div style="font-weight:800;font-size:14px;color:#4edea3;">Firebase Live Mode</div>
+            <div style="font-size:12px;color:#5a6480;">Real data from ESP32 via Firebase RTDB</div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:#9ba8c4;margin-bottom:14px;line-height:1.6;">
+          Reads <code style="background:#0b1326;padding:2px 6px;border-radius:4px;font-size:11px;">/data/pulse</code>,
+          <code style="background:#0b1326;padding:2px 6px;border-radius:4px;font-size:11px;">/data/temp</code>,
+          <code style="background:#0b1326;padding:2px 6px;border-radius:4px;font-size:11px;">/data/movement</code>
+          from your Firebase Realtime Database in real time.
+        </p>
+        <input type="text" id="mode-firebase-url"
+          placeholder="https://your-project-default-rtdb.firebaseio.com"
+          style="width:100%;background:#0b1326;border:1px solid rgba(255,255,255,0.08);
+                 border-radius:8px;padding:10px 14px;color:#e8eeff;font-size:13px;
+                 outline:none;margin-bottom:10px;
+                 font-family:monospace;"
+          onfocus="this.style.borderColor='rgba(78,222,163,0.5)'"
+          onblur="this.style.borderColor='rgba(255,255,255,0.08)'" />
+        <button onclick="switchToFirebase()"
+          style="background:linear-gradient(135deg,#2db880,#4edea3);color:#002113;
+                 border:none;border-radius:8px;padding:10px 20px;font-size:13px;
+                 font-weight:800;cursor:pointer;width:100%;transition:all 0.2s;"
+          onmouseover="this.style.filter='brightness(1.05)'"
+          onmouseout="this.style.filter='none'">
+          🔥 Connect Firebase &amp; Go Live
+        </button>
+      </div>
+
+      <p style="font-size:11px;color:#5a6480;margin-top:16px;text-align:center;">
+        You can switch modes at any time. History resets on switch.
+      </p>
+    </div>
+  </div>
+
+  <!-- ===================== SETTINGS PANEL ===================== -->
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-panel-inner">
+      <div class="settings-panel-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="material-symbols-outlined" style="font-size:18px;color:var(--primary)">tune</span>
+          <span style="font-family:'Manrope',sans-serif;font-weight:800;font-size:14px;">System Settings</span>
+        </div>
+        <button class="settings-close-btn" onclick="toggleSettingsPanel()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="settings-rows">
+        <div class="settings-row">
+          <span class="settings-row-label">
+            <span class="material-symbols-outlined" style="font-size:15px">science</span>
+            Mode
+          </span>
+          <span class="settings-row-val" id="sp-mode">Demo</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label">
+            <span class="material-symbols-outlined" style="font-size:15px">notifications_active</span>
+            Alerts
+          </span>
+          <span class="settings-row-val sp-green">Enabled</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label">
+            <span class="material-symbols-outlined" style="font-size:15px">database</span>
+            Firebase
+          </span>
+          <span class="settings-row-val" id="sp-firebase">Connected</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label">
+            <span class="material-symbols-outlined" style="font-size:15px">wifi</span>
+            Signal
+          </span>
+          <span class="settings-row-val sp-green">Strong</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label">
+            <span class="material-symbols-outlined" style="font-size:15px">battery_full</span>
+            Belt Battery
+          </span>
+          <span class="settings-row-val sp-green">98%</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label">
+            <span class="material-symbols-outlined" style="font-size:15px">settings_input_antenna</span>
+            Device
+          </span>
+          <span class="settings-row-val">Smart Belt v4</span>
+        </div>
+      </div>
+      <button class="settings-mode-btn" onclick="openModePanel();toggleSettingsPanel();">
+        <span class="material-symbols-outlined" style="font-size:15px">swap_horiz</span>
+        Switch Data Source
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== TOAST ===================== -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ===================== LANDING OVERLAY ===================== -->
+  <div class="demo-overlay" id="demo-overlay">
+    <div class="demo-box landing-box">
+
+      <!-- Brand Header -->
+      <div class="landing-brand">
+        <div class="landing-brand-icon">
+          <span class="material-symbols-outlined" style="font-size:36px;color:#4edea3">monitor_heart</span>
+        </div>
+        <div class="landing-brand-badge">IoT Smart Belt v2.4</div>
+      </div>
+
+      <!-- Title -->
+      <h1 class="landing-title">Vitalis Smart Fetal Monitoring System</h1>
+      <p class="landing-subtitle">Real-time fetal health monitoring using IoT and intelligent analytics</p>
+
+      <!-- Description -->
+      <p class="landing-desc">
+        Monitor fetal heart rate, temperature, and movement in real time.<br>
+        Detect abnormal conditions and trigger alerts instantly.
+      </p>
+
+      <!-- Divider -->
+      <div class="landing-rule"></div>
+
+      <!-- Primary Action Buttons -->
+      <div class="landing-actions">
+
+        <!-- Start Live Monitoring -->
+        <div class="landing-action-group">
+          <button class="demo-btn-connect landing-btn-live" onclick="openAdvancedSetup()" id="btn-start-live">
+            <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px">sensors</span>
+            Start Live Monitoring
+          </button>
+          <p class="landing-btn-hint">Connect to real-time IoT device (ESP32)</p>
+        </div>
+
+        <div class="landing-or">OR</div>
+
+        <!-- Run Simulation Demo -->
+        <div class="landing-action-group">
+          <button class="demo-btn-demo landing-btn-demo" onclick="startDemoMode()">
+            <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px">science</span>
+            Run Simulation Demo
+          </button>
+          <p class="landing-btn-hint">Test system behavior using simulated conditions</p>
+        </div>
+      </div>
+
+      <!-- Advanced Setup (Collapsible) -->
+      <div class="landing-advanced" id="landing-advanced">
+        <button class="landing-advanced-toggle" id="advanced-toggle-btn" onclick="toggleAdvancedSetup()">
+          <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle">settings</span>
+          Advanced Setup <span style="font-size:11px;opacity:0.6;">(Optional)</span>
+          <span class="material-symbols-outlined advanced-chevron" id="advanced-chevron" style="font-size:16px;vertical-align:middle;margin-left:4px;transition:transform 0.3s">expand_more</span>
+        </button>
+        <div class="landing-advanced-body" id="advanced-body" style="max-height:0;overflow:hidden;transition:max-height 0.35s ease;">
+          <p style="font-size:12px;color:#5a6480;margin-bottom:12px;line-height:1.6;">
+            Enter your Firebase Realtime Database URL to stream live sensor data from your ESP32 device.
+          </p>
+          <div class="demo-form" style="margin-bottom:0;">
+            <input type="text" id="firebase-url" placeholder="https://your-project.firebaseio.com" class="demo-input" />
+            <button class="demo-btn-connect" style="margin-top:10px;" onclick="connectFirebase()">
+              <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">bolt</span>
+              Connect &amp; Go Live
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Status -->
+      <div class="landing-status-bar" id="landing-status-bar">
+        <span class="landing-status-dot" id="landing-status-dot"></span>
+        <span id="landing-status-text">System Status: Ready&nbsp;&nbsp;|&nbsp;&nbsp;No device connected</span>
+      </div>
+
+    </div>
+  </div>
+
+  <style>
+    /* ===== LANDING OVERLAY ENHANCEMENTS ===== */
+    .landing-box {
+      max-width: 500px;
+      padding: 44px 40px 36px;
+    }
+    .landing-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .landing-brand-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: rgba(78,222,163,0.08);
+      border: 1px solid rgba(78,222,163,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulse-glow 2.5s ease-in-out infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(78,222,163,0.12); }
+      50%       { box-shadow: 0 0 0 10px rgba(78,222,163,0.0); }
+    }
+    .landing-brand-badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #4edea3;
+      background: rgba(78,222,163,0.08);
+      border: 1px solid rgba(78,222,163,0.18);
+      border-radius: 20px;
+      padding: 3px 12px;
+    }
+    .landing-title {
+      font-family: 'Manrope', sans-serif;
+      font-size: 22px;
+      font-weight: 900;
+      color: #e8eeff;
+      text-align: center;
+      line-height: 1.3;
+      margin: 0 0 8px;
+      letter-spacing: -0.3px;
+    }
+    .landing-subtitle {
+      font-size: 13px;
+      font-weight: 500;
+      color: #4edea3;
+      text-align: center;
+      margin: 0 0 18px;
+      letter-spacing: 0.1px;
+      opacity: 0.9;
+    }
+    .landing-desc {
+      font-size: 13px;
+      color: #9ba8c4;
+      text-align: center;
+      line-height: 1.7;
+      margin: 0 0 22px;
+    }
+    .landing-rule {
+      width: 100%;
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+      margin-bottom: 24px;
+    }
+    .landing-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      width: 100%;
+    }
+    .landing-action-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .landing-btn-live,
+    .landing-btn-demo {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .landing-btn-hint {
+      font-size: 11.5px;
+      color: #5a6480;
+      text-align: center;
+      margin: 0;
+      line-height: 1.4;
+    }
+    .landing-or {
+      text-align: center;
+      color: #5a6480;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin: 14px 0;
+      position: relative;
+    }
+    /* Advanced Setup */
+    .landing-advanced {
+      width: 100%;
+      margin-top: 20px;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .landing-advanced-toggle {
+      width: 100%;
+      background: rgba(255,255,255,0.03);
+      border: none;
+      color: #9ba8c4;
+      font-size: 12.5px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      padding: 12px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s, color 0.2s;
+      text-align: left;
+    }
+    .landing-advanced-toggle:hover {
+      background: rgba(255,255,255,0.06);
+      color: #e8eeff;
+    }
+    .landing-advanced-body {
+      padding: 0 16px;
+      background: rgba(11,19,38,0.5);
+    }
+    .landing-advanced-body.is-open {
+      padding: 14px 16px;
+    }
+    /* System Status Bar */
+    .landing-status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 22px;
+      padding: 10px 18px;
+      border-radius: 30px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      font-size: 11.5px;
+      color: #5a6480;
+      font-weight: 500;
+    }
+    .landing-status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #4edea3;
+      flex-shrink: 0;
+      animation: live-blink 2s infinite;
+    }
+    .landing-status-dot.disconnected {
+      background: #5a6480;
+      animation: none;
+    }
+    .landing-status-dot.live {
+      background: #4edea3;
+    }
+
+    /* ===== MOBILE RESPONSIVENESS ===== */
+    @media (max-width: 540px) {
+      .landing-box {
+        padding: 32px 22px 28px;
+        margin: 16px;
+        border-radius: 18px;
+      }
+      .landing-title {
+        font-size: 18px;
+      }
+      .landing-btn-live,
+      .landing-btn-demo,
+      .demo-btn-connect,
+      .demo-btn-demo {
+        width: 100% !important;
+        font-size: 14px !important;
+      }
+      .landing-desc {
+        font-size: 12.5px;
+      }
+    }
+  </style>
+
+  <script>
+    /* ===== LANDING PAGE HELPERS ===== */
+    function openAdvancedSetup() {
+      const body = document.getElementById('advanced-body');
+      const isOpen = body.style.maxHeight && body.style.maxHeight !== '0px' && body.style.maxHeight !== '0';
+      if (!isOpen) {
+        toggleAdvancedSetup(true);
+      }
+      body.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function toggleAdvancedSetup(forceOpen) {
+      const body     = document.getElementById('advanced-body');
+      const chevron  = document.getElementById('advanced-chevron');
+      const isOpen   = body.style.maxHeight && body.style.maxHeight !== '0px' && body.style.maxHeight !== '0';
+      const shouldOpen = forceOpen !== undefined ? forceOpen : !isOpen;
+
+      if (shouldOpen) {
+        body.style.maxHeight = body.scrollHeight + 80 + 'px';
+        body.classList.add('is-open');
+        chevron.style.transform = 'rotate(180deg)';
+      } else {
+        body.style.maxHeight = '0';
+        body.classList.remove('is-open');
+        chevron.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    function updateLandingStatus(text, isLive) {
+      const dot  = document.getElementById('landing-status-dot');
+      const span = document.getElementById('landing-status-text');
+      if (!dot || !span) return;
+      span.textContent = text;
+      dot.className = 'landing-status-dot ' + (isLive ? 'live' : 'disconnected');
+    }
+  </script>
+
+  <script src="app.js"></script>
+</body>
+</html>
