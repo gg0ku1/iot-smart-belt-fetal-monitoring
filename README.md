@@ -33,6 +33,14 @@ The system integrates hardware sensing, cloud computing, and ML into a single mo
 
 ---
 
+## 🌐 Live Dashboard
+
+**Vercel Deployment:** https://fetalhealthmonitoring.vercel.app/
+
+> **Note:** The dashboard visualizes real-time data from Firebase. Live updates are available when the ESP32 device and the Python prediction service are running.
+
+---
+
 ## System Architecture
 
 Pulse Sensor ─┐
