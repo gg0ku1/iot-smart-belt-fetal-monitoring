@@ -47,7 +47,7 @@ Pulse Sensor ─┐
 
 Temp Sensor  ─┼─► ESP32 ──► Firebase RTDB ──► Python (Random Forest)
 
-Vibration    ─┘                                       │
+Vibration    ─┘                                       
 
 Prediction
 
