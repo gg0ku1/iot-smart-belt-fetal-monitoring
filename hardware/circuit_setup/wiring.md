@@ -40,7 +40,7 @@ This document explains how to connect each sensor to the ESP32 DevKit V1 (38-pin
 ## Physical Setup
 
 <p align="center">
-  <img src="hardware/circuit_setup/setup.jpg" width="850">
+  <img src="setup.jpg" width="850">
 </p>
 
 This image shows the exact wiring used in this project.
