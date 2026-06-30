@@ -5,7 +5,7 @@ This document explains how to connect each sensor to the ESP32 DevKit V1 (38-pin
 ## Components
 
 - ESP32 DevKit V1 (38-pin)
-- KY-039 Pulse Sensor
+- Pulse Sensor Amped
 - DHT11 Temperature Sensor (3-pin module)
 - SW-420 Vibration Sensor Module
 
@@ -15,7 +15,7 @@ This document explains how to connect each sensor to the ESP32 DevKit V1 (38-pin
 
 | Sensor | Sensor Pin | ESP32 Pin |
 |---------|------------|-----------|
-| KY-039 Pulse Sensor | VCC | 3.3V |
+| Pulse Sensor Amped | VCC | 3.3V |
 | | GND | GND |
 | | OUT | GPIO34 |
 | DHT11 | VCC | 3.3V |
